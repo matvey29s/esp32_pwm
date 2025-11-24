@@ -5,9 +5,10 @@ PWMController::PWMController(uint8_t pin) : pin_(pin), dutyCycle_(0),
 }
 
 void PWMController::begin() {
-    ledcSetup(0, 5000, 8); // канал 0, 5kHz, 8-bit resolution
-    ledcAttachPin(pin_, 0); // привязываем пин к каналу
-    setDutyCycle(0);
+    // Настройка ШИМ для ESP32
+    ledcSetup(0, 5000, 8);      // Канал 0, частота 5kHz, разрешение 8 бит
+    ledcAttachPin(pin_, 0);     // Привязка пина к каналу 0
+    setDutyCycle(0);            // Инициализация с 0%
     Logger::info("PWM initialized on pin " + String(pin_));
 }
 
@@ -33,8 +34,6 @@ void PWMController::increaseDutyCycle() {
         }
         updatePWM();
         Logger::info("PWM increased to " + String(dutyCycle_) + "%");
-    } else {
-        Logger::debug("PWM already at maximum");
     }
 }
 
@@ -46,8 +45,6 @@ void PWMController::decreaseDutyCycle() {
         }
         updatePWM();
         Logger::info("PWM decreased to " + String(dutyCycle_) + "%");
-    } else {
-        Logger::debug("PWM already at minimum");
     }
 }
 
@@ -87,7 +84,6 @@ void PWMController::resetLongPressCycle() {
 }
 
 void PWMController::updatePWM() {
-    // Конвертируем проценты в 8-битное значение (0-255)
     uint32_t pwmValue = (dutyCycle_ * 255) / 100;
     ledcWrite(0, pwmValue);
 }

@@ -15,7 +15,7 @@ public:
     void decreaseDutyCycle();
     void handleLongPress();
     void resetLongPressCycle();
-    void cycleDutyCycle(); // Новый метод для циклического изменения
+    void cycleDutyCycle();
 
 private:
     uint8_t pin_;

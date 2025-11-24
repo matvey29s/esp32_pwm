@@ -5,12 +5,6 @@ UARTCommandHandler::UARTCommandHandler() : rxIndex_(0), setPWMCallback_(nullptr)
     memset(rxBuffer_, 0, sizeof(rxBuffer_));
 }
 
-void UARTCommandHandler::begin() {
-    Serial.begin(UART_BAUDRATE);
-    Serial.setRxBufferSize(UART_RX_BUFFER_SIZE);
-    Logger::info("UART initialized with baudrate " + String(UART_BAUDRATE));
-}
-
 void UARTCommandHandler::processCommands() {
     while (Serial.available() > 0) {
         char c = Serial.read();
@@ -24,7 +18,6 @@ void UARTCommandHandler::processCommands() {
         } else if (rxIndex_ < (UART_RX_BUFFER_SIZE - 1)) {
             rxBuffer_[rxIndex_++] = c;
         } else {
-            // Буфер переполнен - сбрасываем
             Logger::error("UART buffer overflow - resetting buffer");
             rxIndex_ = 0;
             memset(rxBuffer_, 0, sizeof(rxBuffer_));
@@ -54,7 +47,6 @@ void UARTCommandHandler::processCommand(const String& command) {
         handleGetPWM();
     } else {
         sendResponse("ERROR: Unknown command");
-        Logger::error("Unknown command: " + command);
     }
 }
 

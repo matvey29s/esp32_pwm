@@ -8,7 +8,6 @@
 class UARTCommandHandler {
 public:
     UARTCommandHandler();
-    void begin();
     void processCommands();
     void setPWMCallback(void (*callback)(uint8_t));
     void getPWMCallback(uint8_t (*callback)());
