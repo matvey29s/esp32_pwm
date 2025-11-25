@@ -28,8 +28,7 @@ private:
     unsigned long lastReleaseTime_;
     unsigned long lastDebounceTime_;
     int clickCount_;
-    bool longPressDetected_;
-    bool longPressHandled_;  // Новый флаг для отслеживания обработки длительного нажатия
+    bool longPressEventSent_;
 };
 
 #endif

@@ -3,7 +3,7 @@
 Button::Button(uint8_t pin) : pin_(pin), currentState_(HIGH), lastState_(HIGH),
                              lastPressTime_(0), lastReleaseTime_(0),
                              lastDebounceTime_(0), clickCount_(0),
-                             longPressDetected_(false), longPressHandled_(false) {
+                             longPressEventSent_(false) {  // Инициализируем новое поле
 }
 
 void Button::begin() {
@@ -26,56 +26,46 @@ void Button::update() {
             if (currentState_ == LOW) {
                 // Кнопка нажата
                 lastPressTime_ = millis();
-                longPressDetected_ = false;
-                longPressHandled_ = false;
+                longPressEventSent_ = false;  // Сбрасываем флаг при новом нажатии
+                Logger::debug("Button pressed");
             } else {
                 // Кнопка отпущена
                 lastReleaseTime_ = millis();
+                clickCount_++;
+                Logger::debug("Button released, click count: " + String(clickCount_));
                 
-                // Увеличиваем счетчик кликов только если не было длительного нажатия
-                if (!longPressHandled_) {
-                    clickCount_++;
-                } else {
-                    // После длительного нажатия сбрасываем счетчик
-                    clickCount_ = 0;
-                    longPressHandled_ = false;
-                }
+                // Сбрасываем флаг длительного нажатия при отпускании
+                longPressEventSent_ = false;
             }
         }
     }
     
     lastState_ = reading;
-    
-    // Проверка длительного нажатия
-    if (currentState_ == LOW && !longPressDetected_) {
-        if (millis() - lastPressTime_ > LONG_PRESS_MIN_MS) {
-            longPressDetected_ = true;
-            longPressHandled_ = true;  // Помечаем что длительное нажатие обработано
-            clickCount_ = 0;  // Сбрасываем счетчик кликов
-        }
-    }
 }
 
 ButtonEvent Button::getEvent() {
     ButtonEvent event = EVENT_NONE;
     
-    // Обработка длительного нажатия (сразу при обнаружении)
-    if (longPressDetected_ && currentState_ == LOW) {
-        event = EVENT_LONG_PRESS;
-        longPressDetected_ = false;  // Сбрасываем флаг
-        Logger::info("Button: LONG PRESS");
-        return event;
+    // Проверка длительного нажатия (пока кнопка нажата и еще не отправляли событие)
+    if (currentState_ == LOW && !longPressEventSent_) {
+        if (millis() - lastPressTime_ > LONG_PRESS_MIN_MS) {
+            event = EVENT_LONG_PRESS;
+            longPressEventSent_ = true; // Помечаем что отправили событие
+            clickCount_ = 0; // Сбрасываем счетчик кликов
+            Logger::info(">>> LONG PRESS EVENT <<<");
+            return event;
+        }
     }
     
-    // Обработка кликов (только если не было длительного нажатия)
-    if (currentState_ == HIGH && clickCount_ > 0 && !longPressHandled_) {
+    // Обработка кликов (только когда кнопка отпущена)
+    if (currentState_ == HIGH && clickCount_ > 0) {
         if (millis() - lastReleaseTime_ > DOUBLE_CLICK_MAX_MS) {
             if (clickCount_ == 1) {
                 event = EVENT_SINGLE_CLICK;
-                Logger::info("Button: SINGLE CLICK");
+                Logger::info(">>> SINGLE CLICK EVENT <<<");
             } else if (clickCount_ >= 2) {
                 event = EVENT_DOUBLE_CLICK;
-                Logger::info("Button: DOUBLE CLICK");
+                Logger::info(">>> DOUBLE CLICK EVENT <<<");
             }
             clickCount_ = 0;
         }

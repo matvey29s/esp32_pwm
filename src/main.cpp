@@ -32,6 +32,7 @@ void setup() {
     // Инициализация модулей
     button.begin();
     pwmController.begin();
+    uartHandler.begin();
     statusLed.begin();
     
     // UART callbacks
@@ -55,6 +56,7 @@ void setup() {
     Logger::info("FreeRTOS tasks started");
     Logger::info("Button commands: single=+, double=0, long=cycle");
     Logger::info("UART commands: SET PWM X, GET PWM");
+    Logger::info("UART buffer: " + String(UART_RX_BUFFER_SIZE) + " bytes ring buffer");
     
     vTaskDelete(NULL);
 }
@@ -63,49 +65,77 @@ void loop() {
     vTaskDelete(NULL);
 }
 
-// ЗАДАЧА 1: Обработка кнопки
+// Задача 1: Обработка кнопки - ДИАГНОСТИЧЕСКАЯ ВЕРСИЯ
 void buttonTask(void *parameter) {
     ButtonEvent event;
+    unsigned long lastStateChangeTime = 0;
+    bool lastPhysicalState = HIGH;
     
     while (1) {
-        // Обновление состояния кнопки
-        button.update();
+        // Прямой мониторинг физического состояния кнопки
+        bool currentPhysicalState = digitalRead(BUTTON_PIN);
         
-        // Получение события от кнопки
+        if (currentPhysicalState != lastPhysicalState) {
+            if (currentPhysicalState == LOW) {
+                Logger::info("=== PHYSICAL BUTTON PRESSED ===");
+            } else {
+                Logger::info("=== PHYSICAL BUTTON RELEASED ===");
+            }
+            lastPhysicalState = currentPhysicalState;
+            lastStateChangeTime = millis();
+        }
+        
+        // Обновление логики кнопки
+        button.update();
         event = button.getEvent();
         
-        // Отправка события в очередь
         if (event != EVENT_NONE) {
-            if (xQueueSend(buttonEventQueue, &event, 0) == pdTRUE) {
-                Logger::debug("Button event sent to queue: " + String(event));
+            String eventStr;
+            switch (event) {
+                case EVENT_SINGLE_CLICK: eventStr = "SINGLE_CLICK"; break;
+                case EVENT_DOUBLE_CLICK: eventStr = "DOUBLE_CLICK"; break;
+                case EVENT_LONG_PRESS: eventStr = "LONG_PRESS"; break;
+                default: eventStr = "UNKNOWN"; break;
             }
+            Logger::info(">>> BUTTON EVENT: " + eventStr + " <<<");
+            
+            if (xQueueSend(buttonEventQueue, &event, 0) == pdTRUE) {
+                Logger::info("Event sent to PWM task");
+            }
+        }
+        
+        // Отладочная информация о состоянии
+        static unsigned long lastDebugTime = 0;
+        if (millis() - lastDebugTime > 3000) {
+            Logger::debug("Button state: " + String(button.isPressed() ? "PRESSED" : "RELEASED") +
+                         ", Press time: " + String(millis() - lastStateChangeTime) + "ms");
+            lastDebugTime = millis();
         }
         
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
-// ЗАДАЧА 2: Управление ШИМ
+// Задача 2: Управление ШИМ
 void pwmTask(void *parameter) {
     ButtonEvent event;
     bool longPressActive = false;
     unsigned long lastLongPressTime = 0;
     
     while (1) {
-        // Получение событий от кнопки
         if (xQueueReceive(buttonEventQueue, &event, pdMS_TO_TICKS(50))) {
             switch (event) {
                 case EVENT_SINGLE_CLICK:
                     pwmController.increaseDutyCycle();
                     Logger::info("SINGLE CLICK - PWM: " + String(pwmController.getDutyCycle()) + "%");
-                    longPressActive = false;  // Сбрасываем флаг длительного нажатия
+                    longPressActive = false;
                     statusLed.toggle();
                     break;
                     
                 case EVENT_DOUBLE_CLICK:
                     pwmController.setDutyCycle(0);
                     Logger::info("DOUBLE CLICK - PWM: 0%");
-                    longPressActive = false;  // Сбрасываем флаг длительного нажатия
+                    longPressActive = false;
                     statusLed.toggle();
                     break;
                     
@@ -141,7 +171,7 @@ void pwmTask(void *parameter) {
     }
 }
 
-// ЗАДАЧА 3: Обработка UART
+// Задача 3: Обработка UART
 void uartTask(void *parameter) {
     while (1) {
         uartHandler.processCommands();
@@ -149,7 +179,7 @@ void uartTask(void *parameter) {
     }
 }
 
-// ЗАДАЧА 4: Мигание статусным LED
+// Задача 4: Мигание статусным LED
 void statusLedTask(void *parameter) {
     while (1) {
         statusLed.toggle();
